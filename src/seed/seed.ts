@@ -1,6 +1,7 @@
 import type { Container } from '@/container/container.js';
 import type { User } from '@/domain/entities/user.entity.js';
 import type { InMemoryUserRepository } from '@/repositories/in-memory/in-memory-user.repository.js';
+import type { SqliteUserRepository } from '@/repositories/sqlite/sqlite-user.repository.js';
 
 const USERS: User[] = [
   {
@@ -71,8 +72,20 @@ const ROLES = [
   { name: 'Auditor', description: 'Read-only access to audit logs', type: 'custom', scope: 'global' },
 ] as const;
 
+function seedUsers(container: Container) {
+  type Seedable = InMemoryUserRepository | SqliteUserRepository;
+  const repo = container.repositories.users as Seedable;
+  if (typeof (repo as Seedable).seed === 'function') {
+    (repo as Seedable).seed(USERS);
+  }
+}
+
 export async function seed(container: Container) {
-  (container.repositories.users as InMemoryUserRepository).seed(USERS);
+  if ((await container.repositories.users.count()) === 0) {
+    seedUsers(container);
+  }
+
+  if ((await container.repositories.roles.count()) > 0) return;
 
   const createdRoles = [];
   for (const r of ROLES) {

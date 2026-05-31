@@ -9,3 +9,9 @@ coverage
 .idea
 .vscode/*
 !.vscode/extensions.json
+
+# Local SQLite data
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm

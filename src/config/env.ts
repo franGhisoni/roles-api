@@ -19,6 +19,8 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
+  DATABASE_DRIVER: z.enum(['memory', 'sqlite']).default('sqlite'),
+  DATABASE_URL: z.string().default('file:./data/roles.db'),
 });
 
 export type Env = z.infer<typeof envSchema>;

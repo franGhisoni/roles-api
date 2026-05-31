@@ -12,13 +12,14 @@ Built with **Express + TypeScript** following a layered architecture: `controlle
 | -------------- | ----------------------------------------------- |
 | Runtime        | Node 20, TypeScript 5, ESM                      |
 | HTTP framework | Express 4                                       |
+| Persistence    | **SQLite** (better-sqlite3) with WAL + FK + auto-migrations. In-memory driver available for tests. |
 | Validation     | Zod (request body / query / params)             |
 | Security       | Helmet, CORS, express-rate-limit, timing-safe token compare |
 | Observability  | Pino + pino-http, X-Request-Id correlation, `/status` endpoint with uptime/memory/counts |
 | Docs           | OpenAPI 3.0 spec + Swagger UI at `/docs`        |
-| Tests          | Vitest + Supertest (24 unit + integration tests) |
-| Container      | Multi-stage Dockerfile, non-root user, healthcheck |
-| Deploy         | Railway (Dockerfile + Nixpacks fallback)        |
+| Tests          | Vitest + Supertest (27 unit + integration tests, including a SQLite suite) |
+| Container      | Multi-stage Dockerfile, non-root user, healthcheck, `/data` volume |
+| Deploy         | Railway (Dockerfile + Nixpacks fallback, persistent volume mounted at `/data`) |
 
 ---
 
@@ -65,7 +66,9 @@ Default seeded token (dev only): `dev-token-please-change-me-1234567890`.
 | `LOG_LEVEL`             | `info`                                   | pino levels                                        |
 | `RATE_LIMIT_WINDOW_MS`  | `60000`                                  |                                                    |
 | `RATE_LIMIT_MAX`        | `300`                                    | Per IP per window, only `/api/*`                   |
-| `SEED_DATA`             | `true`                                   | Seed 7 users + 7 roles + 3 assignments at boot     |
+| `SEED_DATA`             | `true`                                   | Seed 7 users + 7 roles + 3 assignments at boot (no-op if DB has rows) |
+| `DATABASE_DRIVER`       | `sqlite`                                 | `sqlite` \| `memory`                               |
+| `DATABASE_URL`          | `file:./data/roles.db`                   | `file:<path>` or `:memory:`                        |
 
 All env vars are validated at boot via Zod. Invalid config fails fast with a readable error.
 
@@ -78,9 +81,11 @@ src/
 ├── config/        env loader (Zod-validated), pino logger
 ├── domain/        entities + AppError hierarchy
 ├── schemas/       Zod request schemas (body/query/params)
+├── db/            SQLite connection + auto-migrations runner
 ├── repositories/  RoleRepository, UserRepository, AssignmentRepository
-│   ├── interfaces/      pure contracts — easy to swap to SQLite/Prisma
-│   └── in-memory/       Map-backed default implementations
+│   ├── interfaces/      pure contracts — the abstraction
+│   ├── in-memory/       Map-backed (used by tests, fast)
+│   └── sqlite/          better-sqlite3 implementations (default driver)
 ├── services/      business rules (uniqueness, cascades, system-role guards)
 ├── controllers/   thin HTTP adapters
 ├── middlewares/   auth (timing-safe), validate, requestId, requestLogger, errorHandler
@@ -163,8 +168,9 @@ npm test
    - `API_TOKEN` (≥ 16 chars, generate one: `openssl rand -hex 24`)
    - `CORS_ORIGIN` (your frontend URL)
    - `NODE_ENV=production`
-4. Railway will detect [`railway.json`](railway.json) and build from the Dockerfile. The healthcheck path is `/api/v1/healthz`.
-5. Confirm the deploy: open `/docs` on the public domain.
+4. **Attach a Volume** (Railway → service → Settings → Volumes) and mount it at `/data` so the SQLite file survives restarts. The Dockerfile already declares `VOLUME ["/data"]` and the default `DATABASE_URL=file:/data/roles.db`.
+5. Railway will detect [`railway.json`](railway.json) and build from the Dockerfile. The healthcheck path is `/api/v1/healthz`.
+6. Confirm the deploy: open `/docs` on the public domain.
 
 ---
 
