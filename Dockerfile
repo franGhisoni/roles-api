@@ -21,7 +21,6 @@ COPY --from=builder --chown=app:app /app/node_modules ./node_modules
 COPY --from=builder --chown=app:app /app/dist ./dist
 COPY --chown=app:app package.json ./
 USER app
-VOLUME ["/data"]
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget --spider -q http://localhost:${PORT:-4000}/api/v1/healthz || exit 1
